@@ -1,0 +1,1 @@
+# Extrator_de_Dados_PDF
