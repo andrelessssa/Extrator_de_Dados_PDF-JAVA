@@ -1,5 +1,11 @@
 package com.arsal.Extrator.de.Diarias;
 
+// 👇👇 NOVOS IMPORTS PARA LER PASTAS E MOVER ARQUIVOS 👇👇
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -8,7 +14,7 @@ import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
 import com.arsal.Extrator.de.Diarias.exception.PdfLeituraException;
 import com.arsal.Extrator.de.Diarias.model.DadosPortaria;
-import com.arsal.Extrator.de.Diarias.service.ExcelService; // 1. IMPORTA O NOVO SERVIÇO
+import com.arsal.Extrator.de.Diarias.service.ExcelService;
 import com.arsal.Extrator.de.Diarias.service.PdfService;
 
 @SpringBootApplication (exclude = {DataSourceAutoConfiguration.class})
@@ -18,7 +24,6 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
         SpringApplication.run(ExtratorDeDiariasApplication.class, args);
     }
 
-    // 2. PEDE AO SPRING PARA INJETAR OS DOIS SERVIÇOS
     @Autowired
     private PdfService pdfService;
     
@@ -28,46 +33,71 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
         System.out.println("==================================================");
-        System.out.println("🚀 INICIANDO AUTOMAÇÃO COMPLETA 🚀");
+        System.out.println("🚀 INICIANDO AUTOMAÇÃO EM LOTE 🚀");
         System.out.println("==================================================");
 
-        // Nossos arquivos
-        String caminhoPdf = "/Users/andrelessa/Desktop/Arsal.pdf"; // Seu PDF na Mesa
-        String caminhoExcel = "Controle_Diarias.xlsx"; // Sua planilha na RAIZ DO PROJETO
+        // --- CAMINHOS DE TRABALHO (Use o caminho absoluto) ---
+        // (Copie o caminho absoluto do seu projeto aqui)
+        String caminhoBaseProjeto = "/Users/andrelessa/Documents/GitHub/Extrator_de_Dados_PDF-JAVA";
 
-        try {
-            // --- ETAPA 1: LER E PROCESSAR O PDF ---
-            System.out.println("Lendo o PDF...");
-            String textoExtraido = pdfService.extrairTextoDePdf(caminhoPdf);
-            DadosPortaria ficha = pdfService.processarTexto(textoExtraido);
-            System.out.println("✅ PDF processado com sucesso!");
+        String pastaEntrada = caminhoBaseProjeto + "/PDFs_PARA_PROCESSAR";
+        String pastaSaida = caminhoBaseProjeto + "/PDFs_PROCESSADOS";
+        String caminhoExcel = caminhoBaseProjeto + "/Controle_Diarias.xlsx";
+        // --- Fim dos caminhos ---
 
-            // --- ETAPA 2: ESCREVER NO EXCEL ---
-            System.out.println("Gravando no Excel...");
-            excelService.adicionarLinha(caminhoExcel, ficha);
+        File diretorioEntrada = new File(pastaEntrada);
+        File[] listaDePdfs = diretorioEntrada.listFiles((dir, nome) -> nome.toLowerCase().endsWith(".pdf"));
 
-            // Se chegamos aqui, deu tudo certo!
-            System.out.println("\n--- 🎉 SUCESSO! 🎉 ---");
-            System.out.println("Dados extraídos e salvos na planilha!");
-            System.out.println("---------------------------------");
-
-        } catch (PdfLeituraException e) {
-            // Pega erros do PDF OU do Excel
-            System.out.println("==================================================");
-            System.out.println("❌ FALHA NA AUTOMAÇÃO ❌");
-            System.out.println("Motivo: " + e.getMessage());
-            System.out.println("==================================================");
-        } catch (Exception e) {
-            // Pega qualquer outro erro inesperado
-            System.out.println("==================================================");
-            System.out.println("❌ FALHA INESPERADA NO PROCESSAMENTO ❌");
-            System.out.println("Motivo: " + e.getMessage());
-            e.printStackTrace(); // Imprime o erro completo
-            System.out.println("==================================================");
+        if (listaDePdfs == null) {
+            System.err.println("❌ ERRO: A pasta 'PDFs_PARA_PROCESSAR' não foi encontrada ou não é uma pasta.");
+            return; // Encerra o programa
         }
 
-        System.out.println("==================================================");
+        if (listaDePdfs.length == 0) {
+            System.out.println("✅ Nenhum PDF encontrado para processar.");
+        } else {
+            System.out.println("Encontrados " + listaDePdfs.length + " PDFs para processar...");
+        }
+
+        int arquivosProcessados = 0;
+        // --- LOOP PRINCIPAL (PARA CADA PDF NA PASTA) ---
+        for (File arquivoPdf : listaDePdfs) {
+            String caminhoPdfAtual = arquivoPdf.getAbsolutePath();
+            System.out.println("\n--- Processando arquivo: " + arquivoPdf.getName() + " ---");
+
+            try {
+                // ETAPA 1: LER E PROCESSAR O PDF
+                String textoExtraido = pdfService.extrairTextoDePdf(caminhoPdfAtual);
+                DadosPortaria ficha = pdfService.processarTexto(textoExtraido);
+                System.out.println("✅ PDF processado!");
+
+                // ETAPA 2: ESCREVER NO EXCEL
+                excelService.adicionarLinha(caminhoExcel, ficha);
+                System.out.println("✅ Dados gravados no Excel!");
+
+                // ETAPA 3: MOVER O ARQUIVO PROCESSADO
+                String caminhoDestino = pastaSaida + "/" + arquivoPdf.getName();
+                Files.move(Paths.get(caminhoPdfAtual), Paths.get(caminhoDestino), StandardCopyOption.REPLACE_EXISTING);
+                System.out.println("✅ Arquivo movido para a pasta 'PDFs_PROCESSADOS'.");
+
+                arquivosProcessados++;
+
+            } catch (PdfLeituraException e) {
+                System.err.println("❌ FALHA AO PROCESSAR ARQUIVO: " + arquivoPdf.getName());
+                System.err.println("Motivo: " + e.getMessage());
+                System.err.println("O arquivo NÃO será movido. Verifique o PDF e tente novamente.");
+            } catch (Exception e) {
+                System.err.println("❌ FALHA INESPERADA: " + arquivoPdf.getName());
+                System.err.println("Motivo: " + e.getMessage());
+                e.printStackTrace();
+                System.err.println("O arquivo NÃO será movido.");
+            }
+        }
+        // --- FIM DO LOOP ---
+
+        System.out.println("\n==================================================");
         System.out.println("🏁 AUTOMAÇÃO CONCLUÍDA 🏁");
+        System.out.println("Total de arquivos processados com sucesso: " + arquivosProcessados);
         System.out.println("==================================================");
     }
 }
