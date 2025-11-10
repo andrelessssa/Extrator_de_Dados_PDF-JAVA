@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 
 import com.arsal.Extrator.de.Diarias.exception.PdfLeituraException;
+import com.arsal.Extrator.de.Diarias.model.DadosPortaria;
 import com.arsal.Extrator.de.Diarias.service.PdfService;
 
 @SpringBootApplication (exclude = {DataSourceAutoConfiguration.class})
@@ -25,27 +26,51 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
         System.out.println("🚀 INICIANDO TESTE DE LEITURA DO PDF 🚀");
         System.out.println("==================================================");
 
-        // O caminho para o seu PDF (mantenha o que funcionou)
         String caminhoParaMeuPdf = "/Users/andrelessa/Desktop/Arsal.pdf"; 
 
-        // 👇👇 MUDANÇA PRINCIPAL AQUI 👇👇
         try {
-            // 1. TENTAMOS executar o código perigoso
+            // 1. extrair o texto bruto
             String textoExtraido = pdfService.extrairTextoDePdf(caminhoParaMeuPdf);
+            System.out.println("✅ Texto extraído com sucesso.");
 
-            // Se chegar aqui, deu tudo certo!
-            System.out.println("\n--- TEXTO EXTRAÍDO DO PDF ---");
-            System.out.println(textoExtraido);
+            
+            DadosPortaria ficha = pdfService.processarTexto(textoExtraido);
+
+            
+            System.out.println("\n--- 📊 DADOS EXTRAÍDOS 📊 ---");
+            System.out.println("Nome: " + ficha.getBeneficiario());
+            System.out.println("CPF: " + ficha.getCpf());
+            System.out.println("Nº Processo: " + ficha.getNumeroProcesso());
+            System.out.println("Matrícula: " + ficha.getMatricula());
+            System.out.println("Cargo: " + ficha.getCargo());
+            System.out.println("Lotação: " + ficha.getLotacao());
+            System.out.println("---------------------------------");
+            System.out.println("Destino (Trechos): " + ficha.getDestino());
+            System.out.println("Data Saída: " + ficha.getDataInicio());
+            System.out.println("Data Volta: " + ficha.getDataFim());
+            System.out.println("Qtd. Diárias: " + ficha.getNumeroDiarias());
+
+            System.out.println("Valor (R$): " + ficha.getValor());
+            System.out.println("Finalidade: " + ficha.getFinalidadeViagem());
+            System.out.println("Nº Portaria: " + ficha.getNumeroPortaria());
+            System.out.println("Data Publicação: " + ficha.getDataPublicacaoPortaria());
+
             System.out.println("---------------------------------");
 
+
         } catch (PdfLeituraException e) {
-            // 2. SE "pegarmos" nosso erro customizado, executamos isso:
+            // Se falhar a LEITURA, cai aqui
             System.out.println("==================================================");
-            System.out.println("❌ FALHA NO PROCESSAMENTO ❌");
-            System.out.println("Motivo: " + e.getMessage()); // Mostra a mensagem amigável
+            System.out.println("❌ FALHA NA LEITURA DO PDF ❌");
+            System.out.println("Motivo: " + e.getMessage());
             System.out.println("==================================================");
-            // Opcional: imprimir o erro original para debug
-            // e.printStackTrace(); 
+        } catch (Exception e) {
+            // Se falhar o PROCESSAMENTO, cai aqui
+            System.out.println("==================================================");
+            System.out.println("❌ FALHA NO PROCESSAMENTO DO TEXTO ❌");
+            System.out.println("Motivo: " + e.getMessage());
+            e.printStackTrace(); // Imprime o erro completo do processamento
+            System.out.println("==================================================");
         }
 
         System.out.println("==================================================");
