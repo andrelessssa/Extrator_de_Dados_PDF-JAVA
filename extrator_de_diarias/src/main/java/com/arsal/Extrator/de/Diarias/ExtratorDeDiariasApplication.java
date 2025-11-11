@@ -1,6 +1,6 @@
 package com.arsal.Extrator.de.Diarias;
 
-// 👇👇 NOVOS IMPORTS PARA LER PASTAS E MOVER ARQUIVOS 👇👇
+// Imports para pastas e arquivos
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -9,8 +9,9 @@ import java.nio.file.StandardCopyOption;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
+import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration; // 1. <<< IMPORT NOVO!
 
 import com.arsal.Extrator.de.Diarias.exception.PdfLeituraException;
 import com.arsal.Extrator.de.Diarias.model.DadosPortaria;
@@ -20,38 +21,85 @@ import com.arsal.Extrator.de.Diarias.service.PdfService;
 @SpringBootApplication (exclude = {DataSourceAutoConfiguration.class})
 public class ExtratorDeDiariasApplication implements CommandLineRunner {
 
+    /**
+     * 2. <<< METODO MAIN ATUALIZADO (CORRIGE O ERRO DA PORTA 8080)
+     * Diz ao Spring para NÃO iniciar um servidor web (Tomcat).
+     * O robô vai rodar e desligar 100%.
+     */
     public static void main(String[] args) {
-        SpringApplication.run(ExtratorDeDiariasApplication.class, args);
+        SpringApplication app = new SpringApplication(ExtratorDeDiariasApplication.class);
+        app.setWebApplicationType(WebApplicationType.NONE); // <-- A MÁGICA
+        app.run(args);
     }
 
+    // Nossos dois "trabalhadores"
     @Autowired
     private PdfService pdfService;
     
     @Autowired
     private ExcelService excelService;
 
+    /**
+     * Este é o método principal que roda a automação.
+     */
     @Override
     public void run(String... args) throws Exception {
         System.out.println("==================================================");
         System.out.println("🚀 INICIANDO AUTOMAÇÃO EM LOTE 🚀");
         System.out.println("==================================================");
 
-        // --- CAMINHOS DE TRABALHO (Use o caminho absoluto) ---
-        // (Copie o caminho absoluto do seu projeto aqui)
-        String caminhoBaseProjeto = "/Users/andrelessa/Documents/GitHub/Extrator_de_Dados_PDF-JAVA";
+        // --- CAMINHOS DE TRABALHO (Fixo em C: para Windows) ---
+        String caminhoBase = "C:/Extrator de Diárias ARSAL";
+        System.out.println("Usando a pasta base: " + caminhoBase);
 
-        String pastaEntrada = caminhoBaseProjeto + "/PDFs_PARA_PROCESSAR";
-        String pastaSaida = caminhoBaseProjeto + "/PDFs_PROCESSADOS";
-        String caminhoExcel = caminhoBaseProjeto + "/Controle_Diarias.xlsx";
+        String pastaEntrada = caminhoBase + "/PDFs_PARA_PROCESSAR";
+        String pastaSaida = caminhoBase + "/PDFs_PROCESSADOS";
+        String caminhoExcel = caminhoBase + "/Controle_Diarias.xlsx";
         // --- Fim dos caminhos ---
 
-        File diretorioEntrada = new File(pastaEntrada);
-        File[] listaDePdfs = diretorioEntrada.listFiles((dir, nome) -> nome.toLowerCase().endsWith(".pdf"));
-
-        if (listaDePdfs == null) {
-            System.err.println("❌ ERRO: A pasta 'PDFs_PARA_PROCESSAR' não foi encontrada ou não é uma pasta.");
-            return; // Encerra o programa
+        
+        // --- ---------------------------------- ---
+        // --- PASSO DE DIAGNÓSTICO ---
+        // --- ---------------------------------- ---
+        System.out.println("\n--- DIAGNÓSTICO INICIAL ---");
+        File diretorioBase = new File(caminhoBase);
+        
+        if (!diretorioBase.exists()) {
+            System.err.println("❌ ERRO DE DIAGNÓSTICO: A pasta base 'C:/Extrator de Diárias ARSAL' NÃO EXISTE.");
+            System.err.println("Verifique o nome da pasta na raiz do C:");
+            return; // Sair
         }
+        
+        System.out.println("O que o Java VÊ dentro de '" + caminhoBase + "':");
+        File[] listaDeArquivosBase = diretorioBase.listFiles();
+        
+        if (listaDeArquivosBase == null) {
+            System.err.println("❌ ERRO DE DIAGNÓSTICO: A pasta base existe, mas o Java não tem PERMISSÃO para ler o conteúdo dela.");
+            return; // Sair
+        }
+        
+        if (listaDeArquivosBase.length == 0) {
+            System.out.println("    (A pasta base está vazia)");
+        } else {
+            for (File f : listaDeArquivosBase) {
+                System.out.println("    -> " + f.getName());
+            }
+        }
+        System.out.println("--- FIM DO DIAGNÓSTICO ---\n");
+        // --- ---------------------------------- ---
+
+        
+        // --- CÓDIGO DE PROCESSAMENTO ---
+        File diretorioEntrada = new File(pastaEntrada);
+        
+        if (!diretorioEntrada.exists() || !diretorioEntrada.isDirectory()) {
+             System.err.println("❌ ERRO GRAVE: A pasta 'PDFs_PARA_PROCESSAR' não foi encontrada em:");
+             System.err.println(pastaEntrada);
+             System.err.println("Verifique se o nome da pasta no DIAGNÓSTICO acima bate EXATAMENTE.");
+             return; 
+        }
+
+        File[] listaDePdfs = diretorioEntrada.listFiles((dir, nome) -> nome.toLowerCase().endsWith(".pdf"));
 
         if (listaDePdfs.length == 0) {
             System.out.println("✅ Nenhum PDF encontrado para processar.");
@@ -60,7 +108,7 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
         }
 
         int arquivosProcessados = 0;
-        // --- LOOP PRINCIPAL (PARA CADA PDF NA PASTA) ---
+        
         for (File arquivoPdf : listaDePdfs) {
             String caminhoPdfAtual = arquivoPdf.getAbsolutePath();
             System.out.println("\n--- Processando arquivo: " + arquivoPdf.getName() + " ---");
@@ -85,7 +133,7 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
             } catch (PdfLeituraException e) {
                 System.err.println("❌ FALHA AO PROCESSAR ARQUIVO: " + arquivoPdf.getName());
                 System.err.println("Motivo: " + e.getMessage());
-                System.err.println("O arquivo NÃO será movido. Verifique o PDF e tente novamente.");
+                System.err.println("O arquivo NÃO será movido.");
             } catch (Exception e) {
                 System.err.println("❌ FALHA INESPERADA: " + arquivoPdf.getName());
                 System.err.println("Motivo: " + e.getMessage());
@@ -93,7 +141,6 @@ public class ExtratorDeDiariasApplication implements CommandLineRunner {
                 System.err.println("O arquivo NÃO será movido.");
             }
         }
-        // --- FIM DO LOOP ---
 
         System.out.println("\n==================================================");
         System.out.println("🏁 AUTOMAÇÃO CONCLUÍDA 🏁");
